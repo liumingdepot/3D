@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>陕西省生态环境业务系统一窗口应用</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <link rel="stylesheet" href="./style/reset.css">
+    <link rel="stylesheet" href="./style/index.css">
+    <style>
+        .name p {
+            width: auto;
+            font-size: 5rem;
+            color: #0bb6ff;
+        }
+
+        .footer {
+            position: fixed;
+            bottom: 90px;
+            width: 100vw;
+            text-align: center;
+            color: #0bb6ff;
+            font-size: 42px;
+            font-family: HEI-FONT, Microsoft YaHei;
+            z-index: 9999999999;
+        }
+    </style>
+</head>
+
+<body>
+<div id="container"></div>
+<div class="masking"></div>
+<div class="header show">
+    <div style="text-align: center;">
+        <img src="images/8ab023d3-cd33-4c5a-b836-6a70d55f8a28.png">
+    </div>
+</div>
+<div class="footer">陕西生态环境厅</div>
+
+<script type="module">
+    import {data} from './table.js';
+    import * as THREE from './threejs/three.module.js';
+    import {TWEEN} from './threejs/tween.module.min.js';
+    import {TrackballControls} from './threejs/TrackballControls.js';
+    import {TransformControls} from './threejs/TransformControls.js';
+    import {CSS3DRenderer, CSS3DObject} from './threejs/CSS3DRenderer.js';
+
+    var cubeParams = { //魔方参数
+        x: 0,
+        y: 0,
+        z: 0,
+        num: 3,
+        domClass: ['out_front', 'out_back', 'out_left', 'out_right', 'out_top', 'out_bottom'],
+        len: 220
+    };
+
+    var camera, scene, renderer, group;
+    var controls;
+
+    var cubeObjects = [];
+    var nameObjects = [];
+    var targets = {table: [], grid: [], name: []};
+    var stopAnimate = false
+    var rotationObject = [
+        {x: 2.1, y: -1, z: -1},
+        {x: 2.29, y: -0.87, z: -0.75},
+        {x: 2.46, y: -0.76, z: -0.5},
+        {x: 2.65, y: -0.65, z: -0.25},
+        {x: 1.9, y: -1, z: -1},
+        {x: 2.09, y: -0.87, z: -0.75},
+        {x: 2.28, y: -0.76, z: -0.5},
+        {x: 2.47, y: -0.65, z: -0.25},
+        {x: 1.7, y: -1, z: -1},
+        {x: 1.89, y: -0.87, z: -0.75},
+        {x: 2.08, y: -0.76, z: -0.5},
+        {x: 2.27, y: -0.65, z: -0.25},
+    ]
+
+    reaetHeader();
+    init();
+    animate();
+
+    // title 设置
+    function reaetHeader() {
+        var windowHeight
+        document.querySelector('.header').setAttribute('style', 'transform: scale(' + window.innerHeight / 1500 + ')')
+    }
+
+    function init() {
+        camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 10000);
+        camera.position.set(0, 0, 6000);
+        camera.lookAt(new THREE.Vector3(0, 0, 0));
+        scene = new THREE.Scene();
+
+        group = new THREE.Group();
+        scene.add(group);
+        group.rotation.x = -0.63;
+        group.rotation.y = 0.0;
+        group.rotation.z = 0.800;
+
+        createCubeObject();
+        createNameObject();
+        // cube-table
+        for (var i = 0; i < cubeObjects.length; i++) {
+            var object = new THREE.Object3D();
+            object.position.x = cubeObjects[i].position.x;
+            object.position.y = cubeObjects[i].position.y;
+            object.position.z = cubeObjects[i].position.z;
+            targets.table.push(object);
+        }
+        // grid
+        for (var i = 0; i < cubeObjects.length; i++) {
+            var object = new THREE.Object3D();
+            object.position.x = ((i % 3) * 780) - 800;
+            object.position.y = (-(Math.floor(i / 3) % 7) * 600) + 350;
+            object.position.z = 0;
+            object.rotation.x = rotationObject[i] ? rotationObject[i].x : 0
+            object.rotation.y = rotationObject[i] ? rotationObject[i].y : 0
+            object.rotation.z = rotationObject[i] ? rotationObject[i].z : 0
+            camera.lookAt(new THREE.Vector3(0, 0, 0));
+
+            targets.grid.push(object);
+        }
+        // text
+        for (var i = 0; i < nameObjects.length; i++) {
+            var object = new THREE.Object3D();
+            object.position.x = ((i % 3) * 780) - 800;
+            object.position.y = (-(Math.floor(i / 3) % 7) * 600) + 350;
+            object.position.z = 0;
+            targets.name.push(object);
+        }
+
+        renderer = new CSS3DRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.getElementById('container').appendChild(renderer.domElement);
+
+        controls = new TrackballControls(camera, renderer.domElement);
+        controls.minDistance = 500;
+        controls.maxDistance = 6000;
+        controls.addEventListener('change', render);
+        // 关闭控制器
+        controls.enabled = false;
+
+        transform(cubeObjects, targets.table, 0);
+        transform(nameObjects, targets.name, 0);
+
+        window.addEventListener('dblclick', boom, false);
+        window.addEventListener('resize', onWindowResize, false);
+
+    }
+
+    function boom() {
+        // 交互动画
+        document.getElementsByClassName('masking')[0].classList.add("show");
+        document.getElementsByClassName('header')[0].classList.add("show");
+        var cube = document.querySelectorAll(".cube");
+        var names = document.querySelectorAll(".name_text");
+        // 隐藏
+        for (var i = 0; i < cube.length; i++) {
+            if (i >= 6) {
+                cube[i].classList.add("hide")
+            }
+        }
+        for (var i = 0; i < names.length; i++) {
+            if (i < 6) {
+                names[i].classList.add("show")
+            } else {
+                names[i].classList.add("hide")
+            }
+        }
+
+        renderer.render(scene, camera);
+        transform(cubeObjects, targets.grid, 2000);
+        // 复位
+        restoration(2000);
+        stopAnimate = true
+        // 关闭控制器
+        controls.enabled = false;
+    }
+
+    // 创建立方体Dom
+    function createCubeElement(index) {
+        var element = document.createElement('div');
+        element.className = 'cube';
+        var img = document.createElement('img');
+        img.className = 'pic';
+        img.src = data[index] && data[index].icon ? data[index].icon : './images/default.png';
+        var el = cubeParams.domClass;
+        for (var i = 0; i < el.length; i++) {
+            var el_div = document.createElement('div');
+            el_div.className = el[i];
+            el_div.appendChild(img.cloneNode(true));
+            element.appendChild(el_div);
+        }
+
+        element.addEventListener('click', function () {
+            if (stopAnimate) {
+                data[index] && data[index].url ? window.open(data[index].url) : ''
+            }
+        })
+        return element;
+    }
+
+    // 创建文字Dom
+    function createNameElement(index) {
+        var name = document.createElement('div');
+        name.className = 'name';
+        var name_p = document.createElement('p');
+        name_p.className = 'name_text';
+        name_p.innerHTML = data[index] && data[index].name ? data[index].name : '占位文字';
+        name.appendChild(name_p)
+        name.addEventListener('click', function () {
+            if (stopAnimate) {
+                data[index] && data[index].url ? window.open(data[index].url) : ''
+            }
+        })
+        return name;
+    }
+
+    function createCubeObject() {
+        var index = 0;
+        var leftUpX = cubeParams.x - cubeParams.num / 2 * cubeParams.len;
+        var leftUpY = cubeParams.y + cubeParams.num / 2 * cubeParams.len;
+        var leftUpZ = cubeParams.z + cubeParams.num / 2 * cubeParams.len;
+        for (var i = 0; i < cubeParams.num; i++) {
+            for (var j = 0; j < cubeParams.num * cubeParams.num; j++) {
+                var element = createCubeElement(index);
+                var object = new CSS3DObject(element);
+                object.position.x = (leftUpX + cubeParams.len / 2) + (j % cubeParams.num) * cubeParams.len;
+                object.position.y = (leftUpY - cubeParams.len / 2) - parseInt(j / cubeParams.num) * cubeParams.len;
+                object.position.z = (leftUpZ - cubeParams.len / 2) - i * cubeParams.len;
+                scene.add(object);
+                cubeObjects.push(object);
+                group.add(object);
+                index++
+            }
+        }
+    }
+
+    function createNameObject() {
+        var index = 0;
+        var leftUpX = cubeParams.x - cubeParams.num / 2 * cubeParams.len;
+        var leftUpY = cubeParams.y + cubeParams.num / 2 * cubeParams.len;
+        var leftUpZ = cubeParams.z + cubeParams.num / 2 * cubeParams.len;
+        for (var i = 0; i < cubeParams.num; i++) {
+            for (var j = 0; j < cubeParams.num * cubeParams.num; j++) {
+                var element = createNameElement(index);
+                var object = new CSS3DObject(element);
+                object.position.x = (leftUpX + cubeParams.len / 2) + (j % cubeParams.num) * cubeParams.len;
+                object.position.y = (leftUpY - cubeParams.len / 2) - parseInt(j / cubeParams.num) * cubeParams.len;
+                object.position.z = (leftUpZ - cubeParams.len / 2) - i * cubeParams.len;
+                scene.add(object);
+                nameObjects.push(object);
+                index++
+            }
+        }
+    }
+
+    function transform(objects, targets, duration) {
+
+        TWEEN.removeAll();
+
+        for (var i = 0; i < objects.length; i++) {
+
+            var object = objects[i];
+            var target = targets[i];
+
+            new TWEEN.Tween(object.position)
+                .to({
+                    x: target.position.x,
+                    y: target.position.y,
+                    z: target.position.z
+                }, Math.random() * duration + duration)
+                .easing(TWEEN.Easing.Exponential.InOut)
+                .start();
+
+            new TWEEN.Tween(object.rotation)
+                .to({x: target.rotation.x, y: target.rotation.y, z: target.rotation.z}, Math.random() * duration / 8)
+                .easing(TWEEN.Easing.Exponential.InOut)
+                .start();
+
+        }
+
+        new TWEEN.Tween(this)
+            .to({}, duration * 2)
+            .onUpdate(render)
+            .start();
+
+    }
+
+    function restoration(duration) {
+
+        new TWEEN.Tween(group.rotation)
+            .to({x: 0, y: 0, z: 0}, 0)
+            .easing(TWEEN.Easing.Exponential.InOut)
+            .start();
+
+        new TWEEN.Tween(camera.position)
+            .to({x: 0, y: 0, z: 2500}, Math.random() * duration + duration)
+            .easing(TWEEN.Easing.Exponential.InOut)
+            .start();
+
+        new TWEEN.Tween(scene.rotation)
+            .to({x: 0, y: 0, z: 0}, Math.random() * duration + duration)
+            .easing(TWEEN.Easing.Exponential.InOut)
+            .start();
+
+        new TWEEN.Tween(this)
+            .to({}, duration * 2)
+            .onUpdate(render)
+            .start();
+    }
+
+    function onWindowResize() {
+        reaetHeader();
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        render();
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        if (!stopAnimate) {
+            var axis = new THREE.Vector3(0, 1, 0);//向量axis
+            scene.rotateOnAxis(axis, -Math.PI / 500);//绕axis轴旋转π/8
+        }
+        renderer.render(scene, camera);
+        TWEEN.update();
+        controls.update();
+    }
+
+    function render() {
+        renderer.render(scene, camera);
+    }
+
+</script>
+</body>
+
+</html>
